@@ -1,4 +1,4 @@
-# Simplified Makefile for JVMTI Agent (macOS only)
+# Simplified Makefile for Jython Loader (macOS only)
 
 # JAVA_HOME detection
 JAVA_HOME := $(shell /usr/libexec/java_home)
@@ -10,8 +10,8 @@ INCLUDES = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/darwin
 SHARED_FLAGS = -dynamiclib
 
 # Targets
-JVMTI_TARGET = jvmti_agent.dylib
-JVMTI_SOURCE = jvmti_agent.cpp
+JVMTI_TARGET = jython_loader.dylib
+JVMTI_SOURCE = jython_loader.cpp
 JAVA_TARGET = TestTarget.class
 JAVA_SOURCE = TestTarget.java
 
@@ -20,7 +20,7 @@ all: $(JVMTI_TARGET) $(JAVA_TARGET)
 
 # Build JVMTI agent
 $(JVMTI_TARGET): $(JVMTI_SOURCE)
-	@echo "Building JVMTI agent for macOS..."
+	@echo "Building Jython loader for macOS..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SHARED_FLAGS) -o $(JVMTI_TARGET) $(JVMTI_SOURCE)
 	@echo "Successfully built $(JVMTI_TARGET)"
 

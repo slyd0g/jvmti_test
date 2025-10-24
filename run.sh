@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# JVMTI Agent Execution Script
-# Assumes jvmti_agent.dylib and TestTarget.class are already built
+# Jython Loader Execution Script
+# Assumes jython_loader.dylib and TestTarget.class are already built
 
 echo "Cleaning up any existing TestTarget processes..."
 pkill -f TestTarget 2>/dev/null && echo "Killed existing TestTarget processes" || echo "No existing TestTarget processes found"
@@ -17,10 +17,10 @@ PID=$(jps | grep TestTarget | cut -d' ' -f1)
 
 if [ -n "$PID" ]; then
     echo "Found TestTarget process: $PID"
-    echo "Attaching JVMTI agent..."
+    echo "Attaching Jython loader..."
     
     # Use absolute path for jcmd
-    AGENT_PATH="$(pwd)/jvmti_agent.dylib"
+    AGENT_PATH="$(pwd)/jython_loader.dylib"
     
     # Check if agent file exists
     if [ ! -f "$AGENT_PATH" ]; then
@@ -32,7 +32,7 @@ if [ -n "$PID" ]; then
     jcmd $PID JVMTI.agent_load "$AGENT_PATH"
     
     echo ""
-    echo "JVMTI agent attached successfully!"
+    echo "Jython loader attached successfully!"
     echo "Waiting 8 seconds for Jython server to start..."
     sleep 8
     
