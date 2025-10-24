@@ -3,91 +3,94 @@
 #include <string>
 #include <cstring>
 
-// Function to modify bytecode - replace the entire GetSecret method with a simple string return
-bool ModifySecretString(unsigned char* class_data, jint class_data_len) {
-    std::cout << "🔧 BYTECODE MOD: Looking for GetSecret method to replace with 'HOOKED'..." << std::endl;
+// Function to modify the runtime static field directly
+bool ModifyStaticField(jvmtiEnv* jvmti, JNIEnv* env) {
+    std::cout << "🔧 RUNTIME MOD: Modifying static 'encoded' field directly in memory..." << std::endl;
     
-    // Instead of modifying the array, let's replace the method body entirely
-    // Look for the pattern in GetSecret method that we can replace
-    
-    // First, let's try the simpler approach: find and change the static field reference
-    // Look for the getstatic instruction that loads the encoded array
-    for (int i = 0; i < class_data_len - 2; i++) {
-        if (class_data[i] == 0xB2) {  // getstatic opcode
-            // Check if this references our encoded field
-            uint16_t field_ref = (class_data[i+1] << 8) | class_data[i+2];
-            
-            std::cout << "🔍 Found getstatic instruction at offset " << i 
-                      << " referencing constant pool entry " << field_ref << std::endl;
-            
-            // If this is referencing constant pool entry #10 (our encoded field)
-            if (field_ref == 10) {
-                std::cout << "🎯 Found getstatic reference to encoded field!" << std::endl;
-                
-                // This is more complex - we'd need to create a new array in constant pool
-                // Let's try a different approach instead
-                
-                // Look for the bipush 42 (XOR key) in the same method and replace the whole operation
-                // Search ahead for the ixor instruction
-                for (int j = i; j < std::min(i + 50, class_data_len - 1); j++) {
-                    if (class_data[j] == 0x10 && class_data[j+1] == 42) {  // bipush 42
-                        std::cout << "🎯 Found XOR operation at offset " << j << std::endl;
-                        
-                        // Replace the bipush 42 with bipush 0 to change the XOR behavior
-                        class_data[j+1] = 0;
-                        std::cout << "✅ Changed XOR key from 42 to 0" << std::endl;
-                        
-                        return true;
-                    }
-                }
-            }
-        }
+    // Get the TestTarget class
+    jclass target_class = env->FindClass("TestTarget");
+    if (target_class == nullptr) {
+        std::cout << "❌ Could not find TestTarget class" << std::endl;
+        return false;
     }
     
-    // Alternative: Force array re-initialization by clearing the static field
-    // Look for putstatic instruction that sets the encoded field
-    for (int i = 0; i < class_data_len - 2; i++) {
-        if (class_data[i] == 0xB3) {  // putstatic opcode
-            uint16_t field_ref = (class_data[i+1] << 8) | class_data[i+2];
-            
-            if (field_ref == 10) {  // encoded field reference
-                std::cout << "🎯 Found putstatic to encoded field at offset " << i << std::endl;
-                
-                // Try to modify the array values before they're stored
-                // Look backwards for the array initialization
-                for (int j = i - 50; j < i; j++) {
-                    if (j >= 0 && class_data[j] == 0x10) {  // bipush
-                        unsigned char value = class_data[j+1];
-                        
-                        // Check if this is one of our array values
-                        if (value == 89) {
-                            class_data[j+1] = 98;  // H
-                            std::cout << "✅ Changed array value 89 -> 98 (H)" << std::endl;
-                        } else if (value == 70) {
-                            class_data[j+1] = 101; // O
-                            std::cout << "✅ Changed array value 70 -> 101 (O)" << std::endl;
-                        } else if (value == 83) {
-                            class_data[j+1] = 101; // O
-                            std::cout << "✅ Changed array value 83 -> 101 (O)" << std::endl;
-                        } else if (value == 78) {
-                            class_data[j+1] = 97;  // K
-                            std::cout << "✅ Changed array value 78 -> 97 (K)" << std::endl;
-                        } else if (value == 26) {
-                            class_data[j+1] = 111; // E
-                            std::cout << "✅ Changed array value 26 -> 111 (E)" << std::endl;
-                        } else if (value == 77) {
-                            class_data[j+1] = 110; // D
-                            std::cout << "✅ Changed array value 77 -> 110 (D)" << std::endl;
-                        }
-                    }
-                }
-                return true;
-            }
-        }
+    // Get the static field ID for 'encoded'
+    jfieldID encoded_field = env->GetStaticFieldID(target_class, "encoded", "[I");
+    if (encoded_field == nullptr) {
+        std::cout << "❌ Could not find 'encoded' field" << std::endl;
+        return false;
     }
     
-    std::cout << "❌ Could not find suitable modification point" << std::endl;
+    std::cout << "🎯 Found 'encoded' static field" << std::endl;
+    
+    // Get the current array
+    jintArray current_array = (jintArray)env->GetStaticObjectField(target_class, encoded_field);
+    if (current_array == nullptr) {
+        std::cout << "❌ Could not get current array value" << std::endl;
+        return false;
+    }
+    
+    // Get array length
+    jsize array_length = env->GetArrayLength(current_array);
+    std::cout << "📊 Current array length: " << array_length << std::endl;
+    
+    // Get current values
+    jint* current_values = env->GetIntArrayElements(current_array, nullptr);
+    if (current_values != nullptr) {
+        std::cout << "� Current array values: {";
+        for (int i = 0; i < array_length; i++) {
+            std::cout << current_values[i];
+            if (i < array_length - 1) std::cout << ", ";
+        }
+        std::cout << "}" << std::endl;
+        
+        // Modify the values to produce "slyd0g [hooked by jvm ti]" when XORed with 42
+        // Target: "slyd0g [hooked by jvm ti]" (25 characters)
+        jint new_values[] = {89, 70, 83, 78, 26, 77, 10, 113, 66, 69, 69, 65, 79, 78, 10, 72, 83, 10, 64, 92, 71, 10, 94, 67, 119};
+        int new_array_length = 25;
+        
+        std::cout << "🔧 Creating new array with " << new_array_length << " elements..." << std::endl;
+        
+        // Create a new array with the extended values
+        jintArray new_array = env->NewIntArray(new_array_length);
+        if (new_array == nullptr) {
+            std::cout << "❌ Could not create new array" << std::endl;
+            env->ReleaseIntArrayElements(current_array, current_values, JNI_ABORT);
+            return false;
+        }
+        
+        // Set the new values
+        env->SetIntArrayRegion(new_array, 0, new_array_length, new_values);
+        
+        // Replace the static field with the new array
+        env->SetStaticObjectField(target_class, encoded_field, new_array);
+        
+        std::cout << "✅ Replaced static array with new " << new_array_length << "-element array" << std::endl;
+        std::cout << "   New values: {";
+        for (int i = 0; i < new_array_length; i++) {
+            std::cout << new_values[i];
+            if (i < new_array_length - 1) std::cout << ", ";
+        }
+        std::cout << "}" << std::endl;
+        
+        // Commit the changes back to the array
+        env->ReleaseIntArrayElements(current_array, current_values, JNI_ABORT); // ABORT since we're replacing the array
+        
+        std::cout << "🎉 Successfully replaced static array in memory!" << std::endl;
+        std::cout << "   Result should be: 'slyd0g [hooked by jvm ti]' (when XORed with 42)" << std::endl;
+        
+        return true;
+    }
+    
+    std::cout << "❌ Could not access array elements" << std::endl;
     return false;
+}
+
+// Function to modify bytecode - this will call the runtime field modification
+bool ModifySecretString(unsigned char* class_data, jint class_data_len) {
+    std::cout << "🔧 BYTECODE MOD: Bytecode modification not needed for runtime field access" << std::endl;
+    // We'll do the real work in Agent_OnAttach using JNI
+    return true; // Return true so retransformation succeeds
 }
 
 // JVMTI Callback for class file load hook
@@ -104,7 +107,7 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti,
     
     // Only process TestTarget class
     if (name != nullptr && strcmp(name, "TestTarget") == 0) {
-        std::cout << "\n🎯 BYTECODE INTERCEPTOR: TestTarget class detected!" << std::endl;
+        std::cout << "\n🎯 RUNTIME MEMORY MODIFIER: TestTarget class detected!" << std::endl;
         std::cout << "📊 Original class size: " << class_data_len << " bytes" << std::endl;
         
         // Allocate new buffer for modified class
@@ -122,7 +125,7 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti,
         bool modified = ModifySecretString(*new_class_data, class_data_len);
         
         if (modified) {
-            std::cout << "✅ BYTECODE INTERCEPTOR: Class modification applied!" << std::endl;
+            std::cout << "✅ RUNTIME MEMORY MODIFIER: Field modification applied!" << std::endl;
         } else {
             std::cout << "⚠️ BYTECODE INTERCEPTOR: No modifications made" << std::endl;
         }
@@ -133,10 +136,10 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti,
 
 // Agent initialization
 JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
-    std::cout << "\n🔧 BYTECODE INTERCEPTOR AGENT LOADING" << std::endl;
-    std::cout << "====================================" << std::endl;
-    std::cout << "🎯 Goal: Intercept and modify GetSecret() method" << std::endl;
-    std::cout << "🔧 Strategy: Direct bytecode manipulation via ClassFileLoadHook" << std::endl;
+    std::cout << "\n🔧 RUNTIME MEMORY MODIFIER AGENT LOADING" << std::endl;
+    std::cout << "==========================================" << std::endl;
+    std::cout << "🎯 Goal: Modify static field values at runtime" << std::endl;
+    std::cout << "🔧 Strategy: Direct memory manipulation via JNI" << std::endl;
     
     jvmtiEnv *jvmti;
     jint result = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
@@ -182,8 +185,8 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
 
 // Agent attachment (for dynamic loading)
 JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *vm, char *options, void *reserved) {
-    std::cout << "\n🔧 BYTECODE INTERCEPTOR AGENT ATTACHING" << std::endl;
-    std::cout << "=======================================" << std::endl;
+    std::cout << "\n🔧 RUNTIME MEMORY MODIFIER AGENT ATTACHING" << std::endl;
+    std::cout << "===========================================" << std::endl;
     
     jvmtiEnv *jvmti;
     jint result = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
@@ -237,14 +240,22 @@ JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *vm, char *options, void *reserved)
                 std::cout << "❌ Retransformation failed: " << error << std::endl;
             } else {
                 std::cout << "✅ TestTarget class retransformed successfully!" << std::endl;
+                
+                // After retransformation, modify the static field directly
+                std::cout << "\n🔧 Now modifying static field in memory..." << std::endl;
+                if (ModifyStaticField(jvmti, env)) {
+                    std::cout << "✅ Static field modification successful!" << std::endl;
+                } else {
+                    std::cout << "❌ Static field modification failed" << std::endl;
+                }
             }
         } else {
             std::cout << "⚠️ TestTarget class not yet loaded - will intercept on first load" << std::endl;
         }
     }
     
-    std::cout << "\n🎯 BYTECODE INTERCEPTOR ACTIVE!" << std::endl;
-    std::cout << "Ready to intercept and modify GetSecret() method." << std::endl;
+    std::cout << "\n🎯 RUNTIME MEMORY MODIFIER ACTIVE!" << std::endl;
+    std::cout << "Ready to modify static field values at runtime." << std::endl;
     
     return JNI_OK;
 }

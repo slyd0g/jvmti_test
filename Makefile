@@ -14,8 +14,8 @@ JVMTI_TARGET = jython_loader.dylib
 JVMTI_SOURCE = jython_loader.cpp
 CAPABILITY_TARGET = capability_enum_agent.dylib
 CAPABILITY_SOURCE = capability_enum_agent.cpp
-INTERCEPTOR_TARGET = bytecode_interceptor_agent.dylib
-INTERCEPTOR_SOURCE = bytecode_interceptor_agent.cpp
+INTERCEPTOR_TARGET = runtime_memory_modifier_agent.dylib
+INTERCEPTOR_SOURCE = runtime_memory_modifier_agent.cpp
 JAVA_TARGET = TestTarget.class
 JAVA_SOURCE = TestTarget.java
 
@@ -34,9 +34,9 @@ $(CAPABILITY_TARGET): $(CAPABILITY_SOURCE)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SHARED_FLAGS) -o $(CAPABILITY_TARGET) $(CAPABILITY_SOURCE)
 	@echo "Successfully built $(CAPABILITY_TARGET)"
 
-# Build bytecode interceptor agent
+# Build runtime memory modifier agent
 $(INTERCEPTOR_TARGET): $(INTERCEPTOR_SOURCE)
-	@echo "Building bytecode interceptor agent for macOS..."
+	@echo "Building runtime memory modifier agent for macOS..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SHARED_FLAGS) -o $(INTERCEPTOR_TARGET) $(INTERCEPTOR_SOURCE)
 	@echo "Successfully built $(INTERCEPTOR_TARGET)"
 
