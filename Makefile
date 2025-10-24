@@ -14,11 +14,13 @@ JVMTI_TARGET = jython_loader.dylib
 JVMTI_SOURCE = jython_loader.cpp
 CAPABILITY_TARGET = capability_enum_agent.dylib
 CAPABILITY_SOURCE = capability_enum_agent.cpp
+INTERCEPTOR_TARGET = bytecode_interceptor_agent.dylib
+INTERCEPTOR_SOURCE = bytecode_interceptor_agent.cpp
 JAVA_TARGET = TestTarget.class
 JAVA_SOURCE = TestTarget.java
 
 # Build all targets
-all: $(JVMTI_TARGET) $(CAPABILITY_TARGET) $(JAVA_TARGET)
+all: $(JVMTI_TARGET) $(CAPABILITY_TARGET) $(INTERCEPTOR_TARGET) $(JAVA_TARGET)
 
 # Build JVMTI agent
 $(JVMTI_TARGET): $(JVMTI_SOURCE)
@@ -32,6 +34,12 @@ $(CAPABILITY_TARGET): $(CAPABILITY_SOURCE)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SHARED_FLAGS) -o $(CAPABILITY_TARGET) $(CAPABILITY_SOURCE)
 	@echo "Successfully built $(CAPABILITY_TARGET)"
 
+# Build bytecode interceptor agent
+$(INTERCEPTOR_TARGET): $(INTERCEPTOR_SOURCE)
+	@echo "Building bytecode interceptor agent for macOS..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $(SHARED_FLAGS) -o $(INTERCEPTOR_TARGET) $(INTERCEPTOR_SOURCE)
+	@echo "Successfully built $(INTERCEPTOR_TARGET)"
+
 # Build Java application
 $(JAVA_TARGET): $(JAVA_SOURCE)
 	@echo "Compiling Java application..."
@@ -40,5 +48,5 @@ $(JAVA_TARGET): $(JAVA_SOURCE)
 
 # Clean all build artifacts
 clean:
-	rm -f $(JVMTI_TARGET) $(CAPABILITY_TARGET) $(JAVA_TARGET)
+	rm -f $(JVMTI_TARGET) $(CAPABILITY_TARGET) $(INTERCEPTOR_TARGET) $(JAVA_TARGET)
 	@echo "Cleaned all build artifacts"
