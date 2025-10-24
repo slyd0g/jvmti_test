@@ -151,10 +151,6 @@ extern "C" JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM* vm, char* options, void
     return JNI_OK;
 }
 
-extern "C" JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM* vm, char* options, void* reserved) {
-    return Agent_OnAttach(vm, options, reserved);
-}
-
 extern "C" JNIEXPORT void JNICALL Agent_OnUnload(JavaVM* vm) {
     std::cout << "🔄 Capability enumeration agent unloading..." << std::endl;
 }

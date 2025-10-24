@@ -134,55 +134,6 @@ void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti,
     }
 }
 
-// Agent initialization
-JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved) {
-    std::cout << "\n🔧 RUNTIME MEMORY MODIFIER AGENT LOADING" << std::endl;
-    std::cout << "==========================================" << std::endl;
-    std::cout << "🎯 Goal: Modify static field values at runtime" << std::endl;
-    std::cout << "🔧 Strategy: Direct memory manipulation via JNI" << std::endl;
-    
-    jvmtiEnv *jvmti;
-    jint result = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
-    if (result != JNI_OK) {
-        std::cout << "❌ Failed to get JVMTI environment: " << result << std::endl;
-        return JNI_ERR;
-    }
-    
-    // Set required capabilities
-    jvmtiCapabilities capabilities = {0};
-    capabilities.can_retransform_classes = 1;
-    capabilities.can_generate_all_class_hook_events = 1;
-    
-    jvmtiError error = jvmti->AddCapabilities(&capabilities);
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to add capabilities: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    std::cout << "✅ Retransformation capabilities acquired" << std::endl;
-    
-    // Set callback for class file load hook
-    jvmtiEventCallbacks callbacks = {0};
-    callbacks.ClassFileLoadHook = ClassFileLoadHook;
-    
-    error = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to set event callbacks: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    // Enable ClassFileLoadHook event
-    error = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, nullptr);
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to enable ClassFileLoadHook: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    std::cout << "✅ ClassFileLoadHook enabled for bytecode interception" << std::endl;
-    
-    return JNI_OK;
-}
-
 // Agent attachment (for dynamic loading)
 JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *vm, char *options, void *reserved) {
     std::cout << "\n🔧 RUNTIME MEMORY MODIFIER AGENT ATTACHING" << std::endl;
