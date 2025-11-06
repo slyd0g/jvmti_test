@@ -1,7 +1,5 @@
 #include <jvmti.h>
 #include <iostream>
-#include <string>
-#include <cstring>
 
 // Function to modify the runtime static field directly
 bool ModifyStaticField(jvmtiEnv* jvmti, JNIEnv* env) {
@@ -86,123 +84,42 @@ bool ModifyStaticField(jvmtiEnv* jvmti, JNIEnv* env) {
     return false;
 }
 
-// Function to modify bytecode - this will call the runtime field modification
-bool ModifySecretString(unsigned char* class_data, jint class_data_len) {
-    std::cout << "🔧 BYTECODE MOD: Bytecode modification not needed for runtime field access" << std::endl;
-    // We'll do the real work in Agent_OnAttach using JNI
-    return true; // Return true so retransformation succeeds
-}
 
-// JVMTI Callback for class file load hook
-void JNICALL ClassFileLoadHook(jvmtiEnv *jvmti,
-                               JNIEnv* jni,
-                               jclass class_being_redefined,
-                               jobject loader,
-                               const char* name,
-                               jobject protection_domain,
-                               jint class_data_len,
-                               const unsigned char* class_data,
-                               jint* new_class_data_len,
-                               unsigned char** new_class_data) {
-    
-    // Only process TestTarget class
-    if (name != nullptr && strcmp(name, "TestTarget") == 0) {
-        std::cout << "\n🎯 RUNTIME MEMORY MODIFIER: TestTarget class detected!" << std::endl;
-        std::cout << "📊 Original class size: " << class_data_len << " bytes" << std::endl;
-        
-        // Allocate new buffer for modified class
-        jvmtiError err = jvmti->Allocate(class_data_len, new_class_data);
-        if (err != JVMTI_ERROR_NONE) {
-            std::cout << "❌ Failed to allocate memory for modified class: " << err << std::endl;
-            return;
-        }
-        
-        // Copy original class data
-        memcpy(*new_class_data, class_data, class_data_len);
-        *new_class_data_len = class_data_len;
-        
-        // Attempt to modify the secret string
-        bool modified = ModifySecretString(*new_class_data, class_data_len);
-        
-        if (modified) {
-            std::cout << "✅ RUNTIME MEMORY MODIFIER: Field modification applied!" << std::endl;
-        } else {
-            std::cout << "⚠️ BYTECODE INTERCEPTOR: No modifications made" << std::endl;
-        }
-        
-        std::cout << "📊 New class size: " << *new_class_data_len << " bytes" << std::endl;
-    }
-}
 
 // Agent attachment (for dynamic loading)
 JNIEXPORT jint JNICALL Agent_OnAttach(JavaVM *vm, char *options, void *reserved) {
     std::cout << "\n🔧 RUNTIME MEMORY MODIFIER AGENT ATTACHING" << std::endl;
     std::cout << "===========================================" << std::endl;
     
+    // Get JNI environment for direct memory operations
+    JNIEnv *env;
+    jint result = vm->GetEnv((void**)&env, JNI_VERSION_1_8);
+    if (result != JNI_OK) {
+        std::cout << "❌ Failed to get JNI environment: " << result << std::endl;
+        return JNI_ERR;
+    }
+    
+    // Get JVMTI environment (needed for ModifyStaticField function signature)
     jvmtiEnv *jvmti;
-    jint result = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
+    result = vm->GetEnv((void **)&jvmti, JVMTI_VERSION);
     if (result != JNI_OK) {
         std::cout << "❌ Failed to get JVMTI environment: " << result << std::endl;
         return JNI_ERR;
     }
     
-    // Set required capabilities
-    jvmtiCapabilities capabilities = {0};
-    capabilities.can_retransform_classes = 1;
-    capabilities.can_generate_all_class_hook_events = 1;
-    
-    jvmtiError error = jvmti->AddCapabilities(&capabilities);
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to add capabilities: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    std::cout << "✅ Retransformation capabilities acquired" << std::endl;
-    
-    // Set callback for class file load hook
-    jvmtiEventCallbacks callbacks = {0};
-    callbacks.ClassFileLoadHook = ClassFileLoadHook;
-    
-    error = jvmti->SetEventCallbacks(&callbacks, sizeof(callbacks));
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to set event callbacks: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    // Enable ClassFileLoadHook event
-    error = jvmti->SetEventNotificationMode(JVMTI_ENABLE, JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, nullptr);
-    if (error != JVMTI_ERROR_NONE) {
-        std::cout << "❌ Failed to enable ClassFileLoadHook: " << error << std::endl;
-        return JNI_ERR;
-    }
-    
-    std::cout << "✅ ClassFileLoadHook enabled for bytecode interception" << std::endl;
-    
-    // Force retransformation of TestTarget class if already loaded
-    JNIEnv *env;
-    if (vm->GetEnv((void**)&env, JNI_VERSION_1_8) == JNI_OK) {
-        jclass target_class = env->FindClass("TestTarget");
-        if (target_class != nullptr) {
-            std::cout << "🎯 TestTarget class found, triggering retransformation..." << std::endl;
-            
-            jclass classes[] = { target_class };
-            error = jvmti->RetransformClasses(1, classes);
-            if (error != JVMTI_ERROR_NONE) {
-                std::cout << "❌ Retransformation failed: " << error << std::endl;
-            } else {
-                std::cout << "✅ TestTarget class retransformed successfully!" << std::endl;
-                
-                // After retransformation, modify the static field directly
-                std::cout << "\n🔧 Now modifying static field in memory..." << std::endl;
-                if (ModifyStaticField(jvmti, env)) {
-                    std::cout << "✅ Static field modification successful!" << std::endl;
-                } else {
-                    std::cout << "❌ Static field modification failed" << std::endl;
-                }
-            }
+    // Find and modify the TestTarget class directly
+    jclass target_class = env->FindClass("TestTarget");
+    if (target_class != nullptr) {
+        std::cout << "🎯 TestTarget class found, modifying static field..." << std::endl;
+        
+        if (ModifyStaticField(jvmti, env)) {
+            std::cout << "✅ Static field modification successful!" << std::endl;
         } else {
-            std::cout << "⚠️ TestTarget class not yet loaded - will intercept on first load" << std::endl;
+            std::cout << "❌ Static field modification failed" << std::endl;
         }
+    } else {
+        std::cout << "⚠️ TestTarget class not found" << std::endl;
+        return JNI_ERR;
     }
     
     std::cout << "\n🎯 RUNTIME MEMORY MODIFIER ACTIVE!" << std::endl;
